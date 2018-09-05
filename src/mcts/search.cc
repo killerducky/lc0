@@ -1,3 +1,4 @@
+// This is foo
 /*
   This file is part of Leela Chess Zero.
   Copyright (C) 2018 The LCZero Authors
