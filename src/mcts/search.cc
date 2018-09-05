@@ -85,12 +85,12 @@ void Search::PopulateUciParams(OptionsParser* options) {
   options->Add<FloatOption>(kFpuReductionStr, -100.0f, 100.0f,
                             "fpu-reduction") = 0.0f;
   options->Add<IntOption>(kCacheHistoryLengthStr, 0, 7,
-                          "cache-history-length") = 7;
+                          "cache-history-length") = 0;
   options->Add<FloatOption>(kPolicySoftmaxTempStr, 0.1f, 10.0f,
                             "policy-softmax-temp") = 1.0f;
   options->Add<IntOption>(kAllowedNodeCollisionsStr, 0, 1024,
                           "allowed-node-collisions") = 0;
-  options->Add<BoolOption>(kOutOfOrderEvalStr, "out-of-order-eval") = false;
+  options->Add<BoolOption>(kOutOfOrderEvalStr, "out-of-order-eval") = true;
   options->Add<BoolOption>(kStickyCheckmateStr, "sticky-checkmate") = false;
 }
 
