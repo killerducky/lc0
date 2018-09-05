@@ -90,7 +90,7 @@ void Search::PopulateUciParams(OptionsParser* options) {
                             "policy-softmax-temp") = 1.0f;
   options->Add<IntOption>(kAllowedNodeCollisionsStr, 0, 1024,
                           "allowed-node-collisions") = 0;
-  options->Add<BoolOption>(kOutOfOrderEvalStr, "out-of-order-eval") = false;
+  options->Add<BoolOption>(kOutOfOrderEvalStr, "out-of-order-eval") = true;
   options->Add<BoolOption>(kStickyCheckmateStr, "sticky-checkmate") = false;
 }
 
