@@ -118,7 +118,6 @@ void Search::AuxEngineWorker() {
   LOGFILE << current_uci_;
 
   Node* n;
-  LOGFILE << "start";
   while (!stop_.load(std::memory_order_acquire)) {
     {
       std::unique_lock<std::mutex> lock(auxengine_mutex_);
@@ -131,7 +130,21 @@ void Search::AuxEngineWorker() {
     } // release lock
     DoAuxEngine(n);
   }
-  LOGFILE << "end";
+  // TODO: For now with this simple queue method,
+  // mark unfinished nodes not done again, and delete the queue.
+  // Next search iteration will fill it again.
+  LOGFILE << "done waiting. auxengine_queue_ size " << auxengine_queue_.size()
+      << " Average duration " << (auxengine_num_evals ? (auxengine_total_dur / auxengine_num_evals) : -1.0f) << "ms"
+      << " Number of evals " << auxengine_num_evals
+      << " Number of updates " << auxengine_num_updates;
+  while (!auxengine_queue_.empty()) {
+    auto n = auxengine_queue_.front();
+    assert(n->GetAuxEngineMove() != 0xffff);
+    if (n->GetAuxEngineMove() == 0xfffe) {
+      n->SetAuxEngineMove(0xffff);
+    }
+    auxengine_queue_.pop();
+  }
 }
 
 void Search::DoAuxEngine(Node* n) {
@@ -150,11 +163,13 @@ void Search::DoAuxEngine(Node* n) {
   }
   LOGFILE << "add pv=" << s;
   s = current_uci_ + " " + s;
+  auto auxengine_start_time = std::chrono::steady_clock::now();
   auxengine_os_ << s << std::endl;
   auxengine_os_ << "go depth " << params_.GetAuxEngineDepth() << std::endl;
   std::string prev_line;
   std::string line;
   std::string token;
+  bool stopping = false;
   while(std::getline(auxengine_is_, line)) {
     //LOGFILE << "auxe:" << line;
     std::istringstream iss(line);
@@ -164,7 +179,26 @@ void Search::DoAuxEngine(Node* n) {
       break;
     }
     prev_line = line;
+    // Don't send a second stop command
+    if (!stopping) {
+      stopping = stop_.load(std::memory_order_acquire);
+      if (stopping) {
+        // Send stop, stay in loop to get best response
+        auxengine_os_ << "stop" << std::endl;
+        LOGFILE << "Stopping";
+      }
+    }
   }
+  if (stopping) {
+    // Don't use results of a search that was stopped.
+    return;
+  }
+  auto auxengine_dur =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::steady_clock::now() - auxengine_start_time)
+      .count();
+  auxengine_total_dur += auxengine_dur;
+  auxengine_num_evals++;
   std::istringstream iss(prev_line);
   std::string pv;
   std::vector<uint16_t> pv_moves;
@@ -210,6 +244,7 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
       edge.edge()->SetP(std::min(new_p, 1.0f));
       // Modifying P invalidates best child logic.
       n->InvalidateBestChild();
+      auxengine_num_updates++;
       // Stop after AuxEngineFollowPvDepth plies deep.
       // or when e.g. ply=0, pv_moves.size()=1 (pv is exhasted)
       // of the edge does not have a node yet.
@@ -232,18 +267,6 @@ void Search::AuxWait() {
     LOGFILE << "Wait for auxengine_threads";
     auxengine_threads_.back().join();
     auxengine_threads_.pop_back();
-  }
-  // TODO: For now with this simple queue method,
-  // mark unfinished nodes not done again, and delete the queue.
-  // Next search iteration will fill it again.
-  LOGFILE << "done waiting. auxengine_queue_ size " << auxengine_queue_.size();
-  while (!auxengine_queue_.empty()) {
-    auto n = auxengine_queue_.front();
-    assert(n->GetAuxEngineMove() != 0xffff);
-    if (n->GetAuxEngineMove() == 0xfffe) {
-      n->SetAuxEngineMove(0xffff);
-    }
-    auxengine_queue_.pop();
   }
 }
 

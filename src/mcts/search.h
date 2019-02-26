@@ -213,6 +213,9 @@ class Search {
   std::mutex auxengine_mutex_;
   std::condition_variable auxengine_cv_;
   std::vector<std::thread> auxengine_threads_;
+  int64_t auxengine_total_dur = 0;
+  int64_t auxengine_num_evals = 0;
+  int64_t auxengine_num_updates = 0;
 
   friend class SearchWorker;
 };
