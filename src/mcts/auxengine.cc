@@ -249,7 +249,7 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
       // or when e.g. ply=0, pv_moves.size()=1 (pv is exhasted)
       // of the edge does not have a node yet.
       // of the edge is a terminal.
-      if (ply < params_.GetAuxEngineFollowPvDepth() &&
+      if (ply+1 < params_.GetAuxEngineFollowPvDepth() &&
           ply+1 < pv_moves.size() &&
           edge.HasNode() &&
           !edge.IsTerminal()) {
