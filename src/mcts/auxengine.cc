@@ -95,7 +95,7 @@ void Search::AuxEngineWorker() {
         iss >> token >> std::ws;
         if (token == "name") {
           iss >> token >> std::ws;
-          if (token == "SyzygyPath") {
+          if (token == "SyzygyPath" && syzygy_tb_) {
             std::ostringstream oss;
             oss << "setoption name SyzygyPath value " << syzygy_tb_->get_paths();
             auxengine_os_ << oss.str() << std::endl;
