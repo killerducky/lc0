@@ -171,7 +171,7 @@ void Search::DoAuxEngine(Node* n) {
   std::string token;
   bool stopping = false;
   while(std::getline(auxengine_is_, line)) {
-    //LOGFILE << "auxe:" << line;
+    LOGFILE << "auxe:" << line;
     std::istringstream iss(line);
     iss >> token >> std::ws;
     if (token == "bestmove") {
