@@ -193,6 +193,11 @@ void Search::DoAuxEngine(Node* n) {
     // Don't use results of a search that was stopped.
     return;
   }
+  LOGFILE << "pv:" << prev_line;
+  LOGFILE << "bestanswer:" << token;
+  if (!auxengine_c_.running()) {
+    throw Exception("AuxEngine died!");
+  }
   auto auxengine_dur =
       std::chrono::duration_cast<std::chrono::milliseconds>(
           std::chrono::steady_clock::now() - auxengine_start_time)
@@ -213,10 +218,11 @@ void Search::DoAuxEngine(Node* n) {
       }
     }
   }
-  LOGFILE << "pv:" << prev_line;
-  LOGFILE << "bestanswer:" << token;
 
-  if (pv_moves[0] != bestmove_packed_int) {
+  if (pv_moves.size() == 0) {
+    LOGFILE << "warning: no pv";
+    pv_moves.push_back(bestmove_packed_int);
+  } else if (pv_moves[0] != bestmove_packed_int) {
     // TODO: Is it possible for PV to not match bestmove?
     LOGFILE << "error: pv doesn't match bestmove:" << pv_moves[0] << " " << "bm" << bestmove_packed_int;
     pv_moves.clear();
