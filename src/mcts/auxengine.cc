@@ -286,7 +286,7 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
 
 void Search::AuxWait() {
   LOGFILE << "AuxWait start";
-  std::unique_lock<std::mutex> lock(auxengine_mutex_);
+  //std::unique_lock<std::mutex> lock(auxengine_mutex_);
   while (!auxengine_threads_.empty()) {
     LOGFILE << "Wait for auxengine_threads";
     auxengine_threads_.back().join();
