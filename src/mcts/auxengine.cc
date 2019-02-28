@@ -78,8 +78,8 @@ void Search::AuxEngineWorker() {
         oss << "setoption name " << token;
         std::getline(iss, token, ';');
         oss << " value " << token;
-        auxengine_os_ << oss.str() << std::endl;
         LOGFILE << oss.str();
+        auxengine_os_ << oss.str() << std::endl;
       }
       auxengine_os_ << "uci" << std::endl;
     }
@@ -98,8 +98,8 @@ void Search::AuxEngineWorker() {
           if (token == "SyzygyPath" && syzygy_tb_) {
             std::ostringstream oss;
             oss << "setoption name SyzygyPath value " << syzygy_tb_->get_paths();
-            auxengine_os_ << oss.str() << std::endl;
             LOGFILE << oss.str();
+            auxengine_os_ << oss.str() << std::endl;
           }
         }
       }
@@ -161,7 +161,9 @@ void Search::DoAuxEngine(Node* n) {
     s = n2->GetOwnEdge()->GetMove(flip).as_string() + " " + s;
     flip = !flip;
   }
-  LOGFILE << "add pv=" << s;
+  if (params_.GetAuxEngineVerbosity() >= 1) {
+    LOGFILE << "add pv=" << s;
+  }
   s = current_uci_ + " " + s;
   auto auxengine_start_time = std::chrono::steady_clock::now();
   auxengine_os_ << s << std::endl;
@@ -171,7 +173,9 @@ void Search::DoAuxEngine(Node* n) {
   std::string token;
   bool stopping = false;
   while(std::getline(auxengine_is_, line)) {
-    //LOGFILE << "auxe:" << line;
+    if (params_.GetAuxEngineVerbosity() >= 2) {
+      LOGFILE << "auxe:" << line;
+    }
     std::istringstream iss(line);
     iss >> token >> std::ws;
     if (token == "bestmove") {
@@ -184,8 +188,8 @@ void Search::DoAuxEngine(Node* n) {
       stopping = stop_.load(std::memory_order_acquire);
       if (stopping) {
         // Send stop, stay in loop to get best response
-        auxengine_os_ << "stop" << std::endl;
         LOGFILE << "Stopping";
+        auxengine_os_ << "stop" << std::endl;
       }
     }
   }
@@ -193,8 +197,10 @@ void Search::DoAuxEngine(Node* n) {
     // Don't use results of a search that was stopped.
     return;
   }
-  LOGFILE << "pv:" << prev_line;
-  LOGFILE << "bestanswer:" << token;
+  if (params_.GetAuxEngineVerbosity() >= 1) {
+    LOGFILE << "pv:" << prev_line;
+    LOGFILE << "bestanswer:" << token;
+  }
   if (!auxengine_c_.running()) {
     throw Exception("AuxEngine died!");
   }
@@ -212,7 +218,13 @@ void Search::DoAuxEngine(Node* n) {
   while(iss >> pv >> std::ws) {
     if (pv == "pv") {
       while(iss >> pv >> std::ws) {
-        auto m = Move(pv, !flip);
+        Move m;
+        if (!Move::ParseMove(&m, pv, !flip)) {
+          if (params_.GetAuxEngineVerbosity() >= 2) {
+            LOGFILE << "Ignore bad pv move: " << pv;
+          }
+          break;
+        }
         pv_moves.push_back(m.as_packed_int());
         flip = !flip;
       }
@@ -220,7 +232,9 @@ void Search::DoAuxEngine(Node* n) {
   }
 
   if (pv_moves.size() == 0) {
-    LOGFILE << "warning: no pv";
+    if (params_.GetAuxEngineVerbosity() >= 1) {
+      LOGFILE << "warning: no pv";
+    }
     pv_moves.push_back(bestmove_packed_int);
   } else if (pv_moves[0] != bestmove_packed_int) {
     // TODO: Is it possible for PV to not match bestmove?
@@ -265,7 +279,7 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
       return;
     }
   }
-  LOGFILE << "error: move not found";
+  throw Exception("AuxUpdateP: Move not found");
 }
 
 void Search::AuxWait() {

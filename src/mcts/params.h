@@ -116,6 +116,9 @@ class SearchParams {
   int GetAuxEngineFollowPvDepth() const {
     return options_.Get<int>(kAuxEngineFollowPvDepthId.GetId());
   }
+  int GetAuxEngineVerbosity() const {
+    return options_.Get<int>(kAuxEngineVerbosityId.GetId());
+  }
 
   // Search parameter IDs.
   static const OptionId kMiniBatchSizeId;
@@ -153,6 +156,7 @@ class SearchParams {
   static const OptionId kAuxEngineDepthId;
   static const OptionId kAuxEngineBoostId;
   static const OptionId kAuxEngineFollowPvDepthId;
+  static const OptionId kAuxEngineVerbosityId;
 
  private:
   const OptionsDict& options_;

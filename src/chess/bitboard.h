@@ -244,6 +244,7 @@ class Move {
               (static_cast<uint8_t>(promotion) << 12)) {}
   Move(const std::string& str, bool black = false);
   Move(const char* str, bool black = false) : Move(std::string(str), black) {}
+  static bool ParseMove(Move* out, const std::string& str, bool black);
 
   BoardSquare to() const { return BoardSquare(data_ & kToMask); }
   BoardSquare from() const { return BoardSquare((data_ & kFromMask) >> 6); }

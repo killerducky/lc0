@@ -283,32 +283,39 @@ const int kQueenCastleIndex =
 }  // namespace
 
 Move::Move(const std::string& str, bool black) {
-  if (str.size() < 4) throw Exception("Bad move: " + str);
-  SetFrom(BoardSquare(str.substr(0, 2), black));
-  SetTo(BoardSquare(str.substr(2, 2), black));
+  if (!ParseMove(this, str, black)) {
+    throw Exception("Bad move: " + str);
+  }
+}
+
+bool Move::ParseMove(Move* out, const std::string& str, bool black) {
+  if (str.size() < 4) return false;
+  out->SetFrom(BoardSquare(str.substr(0, 2), black));
+  out->SetTo(BoardSquare(str.substr(2, 2), black));
   if (str.size() != 4) {
-    if (str.size() != 5) throw Exception("Bad move: " + str);
+    if (str.size() != 5) return false;
     switch (str[4]) {
       case 'q':
       case 'Q':
-        SetPromotion(Promotion::Queen);
+        out->SetPromotion(Promotion::Queen);
         break;
       case 'r':
       case 'R':
-        SetPromotion(Promotion::Rook);
+        out->SetPromotion(Promotion::Rook);
         break;
       case 'b':
       case 'B':
-        SetPromotion(Promotion::Bishop);
+        out->SetPromotion(Promotion::Bishop);
         break;
       case 'n':
       case 'N':
-        SetPromotion(Promotion::Knight);
+        out->SetPromotion(Promotion::Knight);
         break;
       default:
-        throw Exception("Bad move: " + str);
+        return false;
     }
   }
+  return true;
 }
 
 uint16_t Move::as_packed_int() const {
