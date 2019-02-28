@@ -98,8 +98,8 @@ class SearchParams {
   float GetMinimumKLDGainPerNode() const {
     return options_.Get<float>(kMinimumKLDGainPerNode.GetId());
   }
-  std::string GetAuxEnginePath() const {
-    return options_.Get<std::string>(kAuxEnginePathId.GetId());
+  std::string GetAuxEngineFile() const {
+    return options_.Get<std::string>(kAuxEngineFileId.GetId());
   }
   std::string GetAuxEngineOptions() const {
     return options_.Get<std::string>(kAuxEngineOptionsId.GetId());
@@ -150,7 +150,7 @@ class SearchParams {
   static const OptionId kHistoryFillId;
   static const OptionId kMinimumKLDGainPerNode;
   static const OptionId kKLDGainAverageInterval;
-  static const OptionId kAuxEnginePathId;
+  static const OptionId kAuxEngineFileId;
   static const OptionId kAuxEngineOptionsId;
   static const OptionId kAuxEngineThresholdId;
   static const OptionId kAuxEngineDepthId;

@@ -51,12 +51,12 @@ boost::process::child Search::auxengine_c_;
 bool Search::auxengine_ready_ = false;
 
 void Search::OpenAuxEngine() {
-  if (params_.GetAuxEnginePath() == "") return;
+  if (params_.GetAuxEngineFile() == "") return;
   auxengine_threads_.emplace_back([this]() { AuxEngineWorker(); });
 }
 
 void SearchWorker::AuxMaybeEnqueueNode(Node* n) {
-  if (params_.GetAuxEnginePath() != "" &&
+  if (params_.GetAuxEngineFile() != "" &&
       n->GetN() >= params_.GetAuxEngineThreshold() &&
       n->GetAuxEngineMove() == 0xffff &&
       !n->IsTerminal()) {
@@ -69,7 +69,7 @@ void SearchWorker::AuxMaybeEnqueueNode(Node* n) {
 
 void Search::AuxEngineWorker() {
   if (!auxengine_ready_) {
-    auxengine_c_ = boost::process::child(params_.GetAuxEnginePath(), boost::process::std_in < auxengine_os_, boost::process::std_out > auxengine_is_);
+    auxengine_c_ = boost::process::child(params_.GetAuxEngineFile(), boost::process::std_in < auxengine_os_, boost::process::std_out > auxengine_is_);
     {
       std::istringstream iss(params_.GetAuxEngineOptions());
       std::string token;
