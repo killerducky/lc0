@@ -133,6 +133,7 @@ void Search::AuxEngineWorker() {
   // TODO: For now with this simple queue method,
   // mark unfinished nodes not done again, and delete the queue.
   // Next search iteration will fill it again.
+  std::unique_lock<std::mutex> lock(auxengine_mutex_);
   LOGFILE << "done waiting. auxengine_queue_ size " << auxengine_queue_.size()
       << " Average duration " << (auxengine_num_evals ? (auxengine_total_dur / auxengine_num_evals) : -1.0f) << "ms"
       << " Number of evals " << auxengine_num_evals
@@ -145,6 +146,7 @@ void Search::AuxEngineWorker() {
     }
     auxengine_queue_.pop();
   }
+  LOGFILE << "AuxEngineWorker done";
 }
 
 void Search::DoAuxEngine(Node* n) {
@@ -283,11 +285,14 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
 }
 
 void Search::AuxWait() {
+  LOGFILE << "AuxWait start";
+  std::unique_lock<std::mutex> lock(auxengine_mutex_);
   while (!auxengine_threads_.empty()) {
     LOGFILE << "Wait for auxengine_threads";
     auxengine_threads_.back().join();
     auxengine_threads_.pop_back();
   }
+  LOGFILE << "AuxWait done";
 }
 
 }  // namespace lczero
