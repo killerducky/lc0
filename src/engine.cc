@@ -386,8 +386,13 @@ void EngineController::Go(const GoParams& params) {
   search_ = std::make_unique<Search>(*tree_, network_.get(), best_move_callback,
                                      info_callback, limits, options_, &cache_,
                                      syzygy_tb_.get());
+  // AuxEngine needs the UCI string of the position.
+  assert(current_position_);
   search_->current_position_fen_ = current_position_->fen;
   search_->current_position_moves_ = current_position_->moves;
+  if (params.ponder && !current_position_->moves.empty()) {
+    search_->current_position_moves_.pop_back();
+  }
 
   if (limits.search_deadline) {
     LOGFILE << "Timer started at "
