@@ -59,7 +59,8 @@ void SearchWorker::AuxMaybeEnqueueNode(Node* n) {
   if (params_.GetAuxEngineFile() != "" &&
       n->GetN() >= params_.GetAuxEngineThreshold() &&
       n->GetAuxEngineMove() == 0xffff &&
-      !n->IsTerminal()) {
+      !n->IsTerminal() &&
+      n->HasChildren()) {
     n->SetAuxEngineMove(0xfffe); // TODO: magic for pending
     std::lock_guard<std::mutex> lock(search_->auxengine_mutex_);
     search_->auxengine_queue_.push(n);
@@ -258,13 +259,15 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
       if (ply+1 < params_.GetAuxEngineFollowPvDepth() &&
           ply+1 < pv_moves.size() &&
           edge.HasNode() &&
-          !edge.IsTerminal()) {
+          !edge.IsTerminal() &&
+          edge.node()->HasChildren()) {
         AuxUpdateP(edge.node(), pv_moves, ply+1);
       }
       n->SetAuxEngineMove(pv_moves[ply]);
       return;
     }
   }
+  LOGFILE << "AuxUpdateP: Move not found. ply:" << ply;
   throw Exception("AuxUpdateP: Move not found");
 }
 
