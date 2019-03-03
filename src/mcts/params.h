@@ -116,6 +116,9 @@ class SearchParams {
   float GetAuxEngineBoost() const {
     return options_.Get<float>(kAuxEngineBoostId.GetId());
   }
+  int GetAuxEngineBonusThreshold() const {
+    return options_.Get<float>(kAuxEngineBonusThresholdId.GetId());
+  }
   int GetAuxEngineFollowPvDepth() const {
     return options_.Get<int>(kAuxEngineFollowPvDepthId.GetId());
   }
@@ -159,6 +162,7 @@ class SearchParams {
   static const OptionId kAuxEngineDepthId;
   static const OptionId kAuxEngineMovetimeId;
   static const OptionId kAuxEngineBoostId;
+  static const OptionId kAuxEngineBonusThresholdId;
   static const OptionId kAuxEngineFollowPvDepthId;
   static const OptionId kAuxEngineVerbosityId;
 

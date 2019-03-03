@@ -134,10 +134,94 @@ void Search::AuxEngineWorker() {
   LOGFILE << "AuxEngineWorker done";
 }
 
+void Search::ParseAuxOutput(int depth, bool* stopping, std::vector<uint16_t> &pv_moves, int* aux_cp) {
+  std::string line;
+  std::string token;
+  std::string pv_str;
+  *aux_cp = 0;
+  *stopping = false;
+  while(std::getline(auxengine_is_, line)) {
+    if (params_.GetAuxEngineVerbosity() >= 2) {
+      LOGFILE << "auxe:" << line;
+    }
+    std::istringstream iss(line);
+    iss >> token >> std::ws;
+    if (token == "bestmove") {
+      iss >> token;
+      LOGFILE << "pv:" << pv_moves.size() << " " << pv_str;
+      LOGFILE << "bestanswer:" << token << " cp:" << *aux_cp;
+      break;
+    }
+    if (token == "info") {
+      while (getline(iss, token, ' ')) {
+        ////LOGFILE << "aolsen token:" << token;
+        // Note: pv parsing is first, because if it finds a non-move token,
+        // it will fall through to the rest of the code below.
+        if (token == "pv") {
+          // Store for later debug logging if this was the most recent pv
+          pv_str = iss.str();
+          //LOGFILE << "aolsen pv_str:" << pv_str;
+          pv_moves.clear();
+          bool flip = played_history_.IsBlackToMove() ^ (depth % 2 == 0);
+          while (getline(iss, token, ' ')) {
+            ////LOGFILE << "aolsen pvtoken:" << token;
+            Move m;
+            if (!Move::ParseMove(&m, token, !flip)) {
+              LOGFILE << "aolsen nonpv:" << token;
+              break;
+            }
+            pv_moves.push_back(m.as_packed_int());
+            flip = !flip;
+          }
+        }
+        if (token == "cp" || token == "mate") {
+          auto mate = token == "mate";
+          getline(iss, token, ' ');
+          try {
+            *aux_cp = std::stoi(token);
+          } catch(...) {
+            throw Exception("Could not parse cp:" + iss.str());
+          }
+          if (mate) {
+            *aux_cp = *aux_cp > 0 ? 99999 : -99999; // TODO magic 999.99 pawns
+          }
+          //LOGFILE << "aolsen cp:" << *aux_cp;
+        }
+      }
+    }
+    // Don't send a second stop command
+    if (!(*stopping)) {
+      *stopping = stop_.load(std::memory_order_acquire);
+      if (*stopping) {
+        // Send stop, stay in loop to get best response
+        LOGFILE << "Stopping";
+        auxengine_os_ << "stop" << std::endl;
+      }
+    }
+  }
+  if (!auxengine_c_.running()) {
+    throw Exception("AuxEngine died!");
+  }
+  bool flip = played_history_.IsBlackToMove() ^ (depth % 2 == 0);
+  auto bestmove_packed_int = Move(token, !flip).as_packed_int();
+  if (pv_moves.size() == 0) {
+    if (params_.GetAuxEngineVerbosity() >= 1) {
+      LOGFILE << "warning: no pv";
+    }
+    pv_moves.push_back(bestmove_packed_int);
+  } else if (pv_moves[0] != bestmove_packed_int) {
+    // TODO: Is it possible for PV to not match bestmove?
+    LOGFILE << "error: pv doesn't match bestmove:" << pv_moves[0] << " " << "bm" << bestmove_packed_int;
+    pv_moves.clear();
+    pv_moves.push_back(bestmove_packed_int);
+  }
+}
+
 void Search::DoAuxEngine(Node* n) {
   if (n->GetAuxEngineMove() < 0xfffe) {
     return;
   }
+  // TODO I think tree has plynum in it?
   int depth = 0;
   for (Node* n2 = n; n2 != root_node_; n2 = n2->GetParent()) {
     depth++;
@@ -159,41 +243,13 @@ void Search::DoAuxEngine(Node* n) {
   } else {
     auxengine_os_ << "go movetime " << params_.GetAuxEngineMovetime() << std::endl;
   }
-  std::string prev_line;
-  std::string line;
-  std::string token;
-  bool stopping = false;
-  while(std::getline(auxengine_is_, line)) {
-    if (params_.GetAuxEngineVerbosity() >= 2) {
-      LOGFILE << "auxe:" << line;
-    }
-    std::istringstream iss(line);
-    iss >> token >> std::ws;
-    if (token == "bestmove") {
-      iss >> token;
-      break;
-    }
-    prev_line = line;
-    // Don't send a second stop command
-    if (!stopping) {
-      stopping = stop_.load(std::memory_order_acquire);
-      if (stopping) {
-        // Send stop, stay in loop to get best response
-        LOGFILE << "Stopping";
-        auxengine_os_ << "stop" << std::endl;
-      }
-    }
-  }
+  bool stopping;
+  std::vector<uint16_t> pv_moves;
+  int aux_cp;
+  ParseAuxOutput(depth, &stopping, pv_moves, &aux_cp);
   if (stopping) {
     // Don't use results of a search that was stopped.
     return;
-  }
-  if (params_.GetAuxEngineVerbosity() >= 1) {
-    LOGFILE << "pv:" << prev_line;
-    LOGFILE << "bestanswer:" << token;
-  }
-  if (!auxengine_c_.running()) {
-    throw Exception("AuxEngine died!");
   }
   auto auxengine_dur =
       std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -201,44 +257,13 @@ void Search::DoAuxEngine(Node* n) {
       .count();
   auxengine_total_dur += auxengine_dur;
   auxengine_num_evals++;
-  std::istringstream iss(prev_line);
-  std::string pv;
-  std::vector<uint16_t> pv_moves;
-  flip = played_history_.IsBlackToMove() ^ (depth % 2 == 0);
-  auto bestmove_packed_int = Move(token, !flip).as_packed_int();
-  while(iss >> pv >> std::ws) {
-    if (pv == "pv") {
-      while(iss >> pv >> std::ws) {
-        Move m;
-        if (!Move::ParseMove(&m, pv, !flip)) {
-          if (params_.GetAuxEngineVerbosity() >= 2) {
-            LOGFILE << "Ignore bad pv move: " << pv;
-          }
-          break;
-        }
-        pv_moves.push_back(m.as_packed_int());
-        flip = !flip;
-      }
-    }
-  }
 
-  if (pv_moves.size() == 0) {
-    if (params_.GetAuxEngineVerbosity() >= 1) {
-      LOGFILE << "warning: no pv";
-    }
-    pv_moves.push_back(bestmove_packed_int);
-  } else if (pv_moves[0] != bestmove_packed_int) {
-    // TODO: Is it possible for PV to not match bestmove?
-    LOGFILE << "error: pv doesn't match bestmove:" << pv_moves[0] << " " << "bm" << bestmove_packed_int;
-    pv_moves.clear();
-    pv_moves.push_back(bestmove_packed_int);
-  }
   // Take the lock and update the P value of the bestmove
   SharedMutex::Lock lock(nodes_mutex_);
-  AuxUpdateP(n, pv_moves, 0);
+  AuxUpdateP(n, pv_moves, aux_cp, 0);
 }
 
-void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
+void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int aux_cp, int ply) {
   if (n->GetAuxEngineMove() < 0xfffe) {
     // This can happen because nodes are placed in the queue from
     // deepest node first during DoBackupSingeNode
@@ -249,9 +274,18 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
     //}
     return;
   }
+  auto boost = params_.GetAuxEngineBoost()/100.0f;
+  // boost multiplier when AuxEngine finds a good move
+  if (params_.GetAuxEngineBonusThreshold() > 0 &&
+      aux_cp > params_.GetAuxEngineBonusThreshold()) {
+    boost *= float(aux_cp)/float(params_.GetAuxEngineBonusThreshold());
+    if (params_.GetAuxEngineVerbosity() >= 1 && ply <= 1) {
+      LOGFILE << "boost after bonus:" << boost;
+    }
+  }
   for (const auto& edge : n->Edges()) {
     if (edge.GetMove().as_packed_int() == pv_moves[ply]) {
-      auto new_p = edge.GetP() + params_.GetAuxEngineBoost()/100.0f;
+      auto new_p = edge.GetP() + boost;
       edge.edge()->SetP(std::min(new_p, 1.0f));
       // Modifying P invalidates best child logic.
       n->InvalidateBestChild();
@@ -265,7 +299,7 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
           edge.HasNode() &&
           !edge.IsTerminal() &&
           edge.node()->HasChildren()) {
-        AuxUpdateP(edge.node(), pv_moves, ply+1);
+        AuxUpdateP(edge.node(), pv_moves, -aux_cp, ply+1);
       }
       n->SetAuxEngineMove(pv_moves[ply]);
       return;

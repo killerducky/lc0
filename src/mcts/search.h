@@ -203,8 +203,9 @@ class Search {
   void OpenAuxEngine();
   void AuxEngineWorker();
   void AuxWait();
+  void ParseAuxOutput(int depth, bool* stopping, std::vector<uint16_t> &pv_moves, int* aux_cp);
   void DoAuxEngine(Node* n);
-  void AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply);
+  void AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int aux_cp, int ply);
   static boost::process::ipstream auxengine_is_;
   static boost::process::opstream auxengine_os_;
   static boost::process::child auxengine_c_;

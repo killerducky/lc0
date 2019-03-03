@@ -195,6 +195,10 @@ const OptionId SearchParams::kAuxEngineMovetimeId{
 const OptionId SearchParams::kAuxEngineBoostId{
     "auxengine-boost", "AuxEngineBoost",
     "How much to add to Policy, in percentage"};
+const OptionId SearchParams::kAuxEngineBonusThresholdId{
+    "auxengine-bonus-threshold", "AuxEngineBonusThreshold",
+    "Increase boost when cp is greater than threshold. "
+    "Default 100 will give bonus boost when cp is greater than 100."};
 const OptionId SearchParams::kAuxEngineFollowPvDepthId{
     "auxengine-follow-pv-depth", "AuxEngineFollowPvDepth",
     "Add this many plies of the auxengine's PV at a time. "
@@ -242,9 +246,10 @@ void SearchParams::Populate(OptionsParser* options) {
   options->Add<StringOption>(kAuxEngineFileId);
   options->Add<StringOption>(kAuxEngineOptionsId);
   options->Add<IntOption>(kAuxEngineThresholdId, 1, 1000000) = 100;
-  options->Add<IntOption>(kAuxEngineDepthId, 1, 100) = 0;
+  options->Add<IntOption>(kAuxEngineDepthId, 0, 100) = 0;
   options->Add<IntOption>(kAuxEngineMovetimeId, 1, 86400000) = 150;
   options->Add<FloatOption>(kAuxEngineBoostId, 0.0f, 100.0f) = 50.0f;
+  options->Add<FloatOption>(kAuxEngineBonusThresholdId, 0, 99999) = 100;
   options->Add<IntOption>(kAuxEngineFollowPvDepthId, 1, 20) = 4;
   options->Add<IntOption>(kAuxEngineVerbosityId, 0, 10) = 1;
 
