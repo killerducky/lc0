@@ -154,7 +154,11 @@ void Search::DoAuxEngine(Node* n) {
   s = current_uci_ + " " + s;
   auto auxengine_start_time = std::chrono::steady_clock::now();
   auxengine_os_ << s << std::endl;
-  auxengine_os_ << "go depth " << params_.GetAuxEngineDepth() << std::endl;
+  if (params_.GetAuxEngineDepth() > 0) {
+    auxengine_os_ << "go depth " << params_.GetAuxEngineDepth() << std::endl;
+  } else {
+    auxengine_os_ << "go movetime " << params_.GetAuxEngineMovetime() << std::endl;
+  }
   std::string prev_line;
   std::string line;
   std::string token;

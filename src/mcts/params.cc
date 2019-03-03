@@ -188,6 +188,10 @@ const OptionId SearchParams::kAuxEngineThresholdId{
 const OptionId SearchParams::kAuxEngineDepthId{
     "auxengine-depth", "AuxEngineDepth",
     "Depth for the auxiliary engine to search."};
+const OptionId SearchParams::kAuxEngineMovetimeId{
+    "auxengine-movetime", "AuxEngineMovetime",
+    "Time for the auxiliary engine to search in milliseconds. "
+    "AuxEngineDepth must be 0, otherwise depth takes priority."};
 const OptionId SearchParams::kAuxEngineBoostId{
     "auxengine-boost", "AuxEngineBoost",
     "How much to add to Policy, in percentage"};
@@ -238,7 +242,8 @@ void SearchParams::Populate(OptionsParser* options) {
   options->Add<StringOption>(kAuxEngineFileId);
   options->Add<StringOption>(kAuxEngineOptionsId);
   options->Add<IntOption>(kAuxEngineThresholdId, 1, 1000000) = 100;
-  options->Add<IntOption>(kAuxEngineDepthId, 1, 100) = 15;
+  options->Add<IntOption>(kAuxEngineDepthId, 1, 100) = 0;
+  options->Add<IntOption>(kAuxEngineMovetimeId, 1, 86400000) = 150;
   options->Add<FloatOption>(kAuxEngineBoostId, 0.0f, 100.0f) = 50.0f;
   options->Add<IntOption>(kAuxEngineFollowPvDepthId, 1, 20) = 4;
   options->Add<IntOption>(kAuxEngineVerbosityId, 0, 10) = 1;
