@@ -50,7 +50,7 @@ boost::process::opstream Search::auxengine_os_;
 boost::process::child Search::auxengine_c_;
 bool Search::auxengine_ready_ = false;
 
-void Search::OpenAuxEngine() {
+void Search::OpenAuxEngine() REQUIRES(threads_mutex_) {
   if (params_.GetAuxEngineFile() == "") return;
   auxengine_threads_.emplace_back([this]() { AuxEngineWorker(); });
 }
@@ -59,7 +59,8 @@ void SearchWorker::AuxMaybeEnqueueNode(Node* n) {
   if (params_.GetAuxEngineFile() != "" &&
       n->GetN() >= params_.GetAuxEngineThreshold() &&
       n->GetAuxEngineMove() == 0xffff &&
-      !n->IsTerminal()) {
+      !n->IsTerminal() &&
+      n->HasChildren()) {
     n->SetAuxEngineMove(0xfffe); // TODO: magic for pending
     std::lock_guard<std::mutex> lock(search_->auxengine_mutex_);
     search_->auxengine_queue_.push(n);
@@ -130,21 +131,7 @@ void Search::AuxEngineWorker() {
     } // release lock
     DoAuxEngine(n);
   }
-  // TODO: For now with this simple queue method,
-  // mark unfinished nodes not done again, and delete the queue.
-  // Next search iteration will fill it again.
-  LOGFILE << "done waiting. auxengine_queue_ size " << auxengine_queue_.size()
-      << " Average duration " << (auxengine_num_evals ? (auxengine_total_dur / auxengine_num_evals) : -1.0f) << "ms"
-      << " Number of evals " << auxengine_num_evals
-      << " Number of updates " << auxengine_num_updates;
-  while (!auxengine_queue_.empty()) {
-    auto n = auxengine_queue_.front();
-    assert(n->GetAuxEngineMove() != 0xffff);
-    if (n->GetAuxEngineMove() == 0xfffe) {
-      n->SetAuxEngineMove(0xffff);
-    }
-    auxengine_queue_.pop();
-  }
+  LOGFILE << "AuxEngineWorker done";
 }
 
 void Search::DoAuxEngine(Node* n) {
@@ -272,22 +259,48 @@ void Search::AuxUpdateP(Node* n, std::vector<uint16_t> pv_moves, int ply) {
       if (ply+1 < params_.GetAuxEngineFollowPvDepth() &&
           ply+1 < pv_moves.size() &&
           edge.HasNode() &&
-          !edge.IsTerminal()) {
+          !edge.IsTerminal() &&
+          edge.node()->HasChildren()) {
         AuxUpdateP(edge.node(), pv_moves, ply+1);
       }
       n->SetAuxEngineMove(pv_moves[ply]);
       return;
     }
   }
+  LOGFILE << "AuxUpdateP: Move not found. ply:" << ply;
   throw Exception("AuxUpdateP: Move not found");
 }
 
-void Search::AuxWait() {
+void Search::AuxWait() REQUIRES(threads_mutex_) {
+  LOGFILE << "AuxWait start";
   while (!auxengine_threads_.empty()) {
     LOGFILE << "Wait for auxengine_threads";
     auxengine_threads_.back().join();
     auxengine_threads_.pop_back();
   }
+  // Threading/Locking:
+  // - Search::Wait is holding threads_mutex_.
+  // - SearchWorker threads are guaranteed done by Search::Wait
+  // - Above code guarantees auxengine_threads_ are done.
+  // - This is the only thread left that can modify auxengine_queue_
+  // - Take the lock anyways to be safe.
+  std::unique_lock<std::mutex> lock(auxengine_mutex_);
+  LOGFILE << "done waiting. auxengine_queue_ size " << auxengine_queue_.size()
+      << " Average duration " << (auxengine_num_evals ? (auxengine_total_dur / auxengine_num_evals) : -1.0f) << "ms"
+      << " Number of evals " << auxengine_num_evals
+      << " Number of updates " << auxengine_num_updates;
+  // TODO: For now with this simple queue method,
+  // mark unfinished nodes not done again, and delete the queue.
+  // Next search iteration will fill it again.
+  while (!auxengine_queue_.empty()) {
+    auto n = auxengine_queue_.front();
+    assert(n->GetAuxEngineMove() != 0xffff);
+    if (n->GetAuxEngineMove() == 0xfffe) {
+      n->SetAuxEngineMove(0xffff);
+    }
+    auxengine_queue_.pop();
+  }
+  LOGFILE << "AuxWait done";
 }
 
 }  // namespace lczero

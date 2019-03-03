@@ -236,6 +236,7 @@ class SearchWorker {
     do {
       ExecuteOneIteration();
     } while (search_->IsSearchActive());
+    LOGFILE << "Stopped search thread.";
   }
 
   // Does one full iteration of MCTS search:
