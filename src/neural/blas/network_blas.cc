@@ -27,6 +27,7 @@
 #include "neural/shared/activation.h"
 #include "neural/shared/policy_map.h"
 #include "neural/shared/winograd_filter.h"
+#include "src/chess/position.h"
 
 #include <algorithm>
 #include <cassert>
@@ -127,6 +128,65 @@ BlasComputation::BlasComputation(const LegacyWeights& weights,
       wdl_(wdl),
       conv_policy_(conv_policy) {}
 
+namespace {
+void PrettyPrint(float* data, int channels) {
+  std::ostringstream oss;
+  oss << "PrettyPrint" << std::endl;
+  oss << std::fixed;
+  oss << std::right;
+  oss << std::setw(9);
+  oss << std::setprecision(5);
+  for (size_t channel = 0; channel < channels; channel++) {
+    oss << "channel:" << channel << std::endl;
+    for (size_t rank = 0; rank < 8; rank++) {
+      for (size_t file = 0; file < 8; file++) {
+        oss << " " << std::setw(8) << std::setprecision(5) << *data;
+        data++;
+      }
+      oss << std::endl;
+    }
+    oss << std::endl;
+  }
+  LOGFILE << oss.str();
+}
+void PrintCRF(float* data, int channel, int rank, int file) {
+  LOGFILE << "aolsen channel:" << channel
+      << " rank:" << rank
+      << " file:" << file
+      << " data:" << *(data+(channel*64+rank*8+file));
+}
+// see FullyConnectedLayer::Forward1D
+// input_size = 80*64 = 5120
+// output_size = 1858
+// number of multiplies: 5120*1858 = 9512960
+void MyFC(size_t batch_size, const size_t input_size,
+          const size_t output_size,
+          const float* inputs, const float* weights,
+          const float* biases, bool apply_relu,
+          float* outputs) {
+  size_t channels = input_size/64;
+  LOGFILE << "aolsen channels:" << channels << " output_size:" << output_size;
+  for (size_t o = 0; o < output_size; o++) {
+    outputs[o] = 0;
+  }
+  for (size_t channel = 0; channel < channels; channel++) {
+    for (size_t rank = 0; rank < 8; rank++) {
+      for (size_t file = 0; file < 8; file++) {
+        auto i = channel*64+rank*8+file;
+        for (size_t o = 0; o < output_size; o++) {
+          auto idx = o*input_size + i;
+          auto mult = inputs[i] * weights[idx];
+          if ((o == 1792 || o==1795) && std::abs(mult) > 0.001) {
+            LOGFILE << "i:" << i << " o:" << o << " idx:" << idx << " in[i]:" << inputs[i] << " w[idx]:" << weights[idx] << " mult:" << mult;
+          }
+          outputs[o] += mult;
+        }
+      }
+    }
+  }
+}
+}
+
 void BlasComputation::ComputeBlocking() {
   // Retrieve network key dimensions from the weights structure.
   const auto num_value_channels = weights_.ip1_val_b.size();
@@ -190,6 +250,11 @@ void BlasComputation::ComputeBlocking() {
     convolve3.Forward(batch_size, kInputPlanes, output_channels, conv_in,
                       weights_.input.weights.data(), conv_out);
 
+    LOGFILE << "aolsen input planes";
+    PrettyPrint(conv_in, 112);
+    LOGFILE << "aolsen after input";
+    PrettyPrint(conv_out, output_channels);
+
     BiasResidualRelu(batch_size, output_channels, conv_out,
                      weights_.input.biases.data());
 
@@ -230,6 +295,8 @@ void BlasComputation::ComputeBlocking() {
                          conv2.biases.data(), res);
       }
     }
+    LOGFILE << "aolsen after residual tower";
+    PrettyPrint(conv_out, output_channels);
 
     if (conv_policy_) {
       // Need to preserve conv_out which is used for value head
@@ -263,8 +330,28 @@ void BlasComputation::ComputeBlocking() {
           batch_size, output_channels, num_policy_input_planes, conv_out,
           weights_.policy.weights.data(), policy_buffer.data());
 
+      //LOGFILE << "aolsen after policy convole to :" << num_policy_input_planes;
+      //PrettyPrint(policy_buffer.data(), num_policy_input_planes);
       BiasResidualRelu(batch_size, num_policy_input_planes, &policy_buffer[0],
                        weights_.policy.biases.data());
+
+      LOGFILE << "aolsen after policy batchnorm";
+      PrettyPrint(policy_buffer.data(), num_policy_input_planes);
+      PrintCRF(policy_buffer.data(), 33, 7, 0);
+      auto a2a1q = Move("a2a1q", true);
+      auto a2b1q = Move("a2b1q", true);
+      LOGFILE << "ip_pol_w size:" << weights_.ip_pol_w.size();
+      LOGFILE << "ip_pol_b size:" << weights_.ip_pol_b.size();
+      MyFC(
+          batch_size, num_policy_input_planes * kSquares, num_output_policy,
+          policy_buffer.data(), weights_.ip_pol_w.data(),
+          weights_.ip_pol_b.data(),
+          false,  // Relu Off
+          output_pol.data());
+
+      LOGFILE << "aolsen MyFC policy raw:";
+      LOGFILE << "a2a1q id:" << a2a1q.as_nn_index() << " " << output_pol[a2a1q.as_nn_index()];
+      LOGFILE << "a2b1q id:" << a2b1q.as_nn_index() << " " << output_pol[a2b1q.as_nn_index()];
 
       FullyConnectedLayer::Forward1D(
           batch_size, num_policy_input_planes * kSquares, num_output_policy,
@@ -272,6 +359,10 @@ void BlasComputation::ComputeBlocking() {
           weights_.ip_pol_b.data(),
           false,  // Relu Off
           output_pol.data());
+
+      LOGFILE << "aolsen policy raw:";
+      LOGFILE << "a2a1q id:" << a2a1q.as_nn_index() << " " << output_pol[a2a1q.as_nn_index()];
+      LOGFILE << "a2b1q id:" << a2b1q.as_nn_index() << " " << output_pol[a2b1q.as_nn_index()];
     }
 
     // Value head

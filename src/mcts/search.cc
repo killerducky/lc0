@@ -1243,9 +1243,17 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
               : FastPow2(FastLog2(p) / params_.GetPolicySoftmaxTemp());
     }
     edge.edge()->SetP(p);
+    auto a2a1q = Move("a2a1q", true);
+    auto a2b1q = Move("a2b1q", true);
+
+    if (edge.GetMove().as_nn_index() == a2b1q.as_nn_index() ||
+        edge.GetMove().as_nn_index() == a2a1q.as_nn_index()) {
+      LOGFILE << edge.GetMove().as_nn_index() << " " << p;
+    }
     // Edge::SetP does some rounding, so only add to the total after rounding.
     total += edge.edge()->GetP();
   }
+
   // Normalize P values to add up to 1.0.
   if (total > 0.0f) {
     const float scale = 1.0f / total;
