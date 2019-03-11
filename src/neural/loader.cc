@@ -43,6 +43,7 @@
 #include "utils/filesystem.h"
 #include "utils/logging.h"
 #include "version.h"
+#include "utils/weights_adapter.h"
 
 namespace lczero {
 
@@ -135,6 +136,28 @@ WeightsFile ParseWeightsProto(const std::string& buffer) {
     net_format->set_network(nf::NETWORK_SE_WITH_HEADFORMAT);
     net_format->set_value(nf::VALUE_CLASSICAL);
     net_format->set_policy(nf::POLICY_CLASSICAL);
+  }
+
+  if (0) {
+    LOGFILE << "aolsen format:" << net.format().DebugString();
+    auto bmin = net.weights().ip_pol_b().min_val();
+    auto brange = net.weights().ip_pol_b().max_val() - bmin;
+    {
+    auto bmod = LayerAdapter(net.weights().ip_pol_b()).as_vector();
+    LOGFILE << "aolsen bmod[0]:" << bmod[0];
+    }
+    {
+    auto bmod = reinterpret_cast<const uint16_t*>(net.weights().ip_pol_b().params().data());
+    LOGFILE << "aolsen bmod[0]:" << bmod[0];
+    }
+   
+    // what is wrong here? should be same as above
+    auto bmod = reinterpret_cast<uint16_t*>(net.mutable_weights()->mutable_ip_pol_b()->mutable_params());
+    LOGFILE << "aolsen bmod[0]:" << bmod[0];
+   
+    //auto wmod = reinterpret_cast<uint16_t*>(net.mutable_weights()->mutable_ip_pol_w()->mutable_params());
+    //float tmp = bmod[0] / static_cast<float>(0xffff) * brange + bmin;
+    //LOGFILE << "aolsen bias[0]:" << tmp << " min:" << bmin << " max:" << net.weights().ip_pol_b().max_val() << " range:" << brange << " raw:" << bmod[0];
   }
 
   return net;

@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 
 namespace lczero {
@@ -159,6 +160,8 @@ void PrintCRF(float* data, int channel, int rank, int file) {
 // input_size = 80*64 = 5120
 // output_size = 1858
 // number of multiplies: 5120*1858 = 9512960
+float wmod[5120*1858];
+float bmod[1858];
 void MyFC(size_t batch_size, const size_t input_size,
           const size_t output_size,
           const float* inputs, const float* weights,
@@ -166,18 +169,45 @@ void MyFC(size_t batch_size, const size_t input_size,
           float* outputs) {
   size_t channels = input_size/64;
   LOGFILE << "aolsen channels:" << channels << " output_size:" << output_size;
-  for (size_t o = 0; o < output_size; o++) {
-    outputs[o] = 0;
+  LOGFILE << "aolsen bias[0]:" << biases[0] << " 1792:" << biases[1792] << " 1795:" << biases[1795];
+
+  // average two promotion types
+  std::memcpy(bmod, biases, sizeof(float)*1858);
+  std::memcpy(wmod, weights, sizeof(float)*5120*1858);
+  
+  for (int i=0; i<5; i++) {
+    LOGFILE << "aolsen wmod[" << i << "]:" << wmod[i];
   }
+
+  if (0) {
+    bmod[1792] = (bmod[1795] + bmod[1792]) / 2;
+    for (size_t channel = 0; channel < channels; channel++) {
+      for (size_t rank = 0; rank < 8; rank++) {
+        for (size_t file = 0; file < 8; file++) {
+          auto i = channel*64+rank*8+file;
+          auto idx1792 = 1792*input_size + i;
+          auto idx1795 = 1795*input_size + i;
+          wmod[idx1792] = (wmod[idx1792] + wmod[idx1795]) / 2;
+          wmod[idx1795] = wmod[idx1792];
+        }
+      }
+    }
+  }
+
+  // initialize bias
+  for (size_t o = 0; o < output_size; o++) {
+    outputs[o] = bmod[o];
+  }
+  // do weights
   for (size_t channel = 0; channel < channels; channel++) {
     for (size_t rank = 0; rank < 8; rank++) {
       for (size_t file = 0; file < 8; file++) {
         auto i = channel*64+rank*8+file;
         for (size_t o = 0; o < output_size; o++) {
           auto idx = o*input_size + i;
-          auto mult = inputs[i] * weights[idx];
+          auto mult = inputs[i] * wmod[idx];
           if ((o == 1792 || o==1795) && std::abs(mult) > 0.001) {
-            LOGFILE << "i:" << i << " o:" << o << " idx:" << idx << " in[i]:" << inputs[i] << " w[idx]:" << weights[idx] << " mult:" << mult;
+            LOGFILE << "i:" << i << " o:" << o << " idx:" << idx << " in[i]:" << inputs[i] << " w[idx]:" << wmod[idx] << " mult:" << mult;
           }
           outputs[o] += mult;
         }
