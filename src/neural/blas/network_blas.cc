@@ -130,7 +130,7 @@ BlasComputation::BlasComputation(const LegacyWeights& weights,
       conv_policy_(conv_policy) {}
 
 namespace {
-void PrettyPrint(float* data, int channels) {
+void PrettyPrint(float* data, int channels, int this_channel=-1) {
   std::ostringstream oss;
   oss << "PrettyPrint" << std::endl;
   oss << std::fixed;
@@ -138,15 +138,16 @@ void PrettyPrint(float* data, int channels) {
   oss << std::setw(9);
   oss << std::setprecision(5);
   for (size_t channel = 0; channel < channels; channel++) {
-    oss << "channel:" << channel << std::endl;
+    auto skip = this_channel >=0 && this_channel != channel;
+    if (!skip) oss << "channel:" << channel << std::endl;
     for (size_t rank = 0; rank < 8; rank++) {
       for (size_t file = 0; file < 8; file++) {
-        oss << " " << std::setw(8) << std::setprecision(5) << *data;
+        if (!skip) oss << " " << std::setw(8) << std::setprecision(5) << *data;
         data++;
       }
-      oss << std::endl;
+      if (!skip) oss << std::endl;
     }
-    oss << std::endl;
+    if (!skip) oss << std::endl;
   }
   LOGFILE << oss.str();
 }
@@ -206,8 +207,8 @@ void MyFC(size_t batch_size, const size_t input_size,
         for (size_t o = 0; o < output_size; o++) {
           auto idx = o*input_size + i;
           auto mult = inputs[i] * wmod[idx];
-          if ((o == 1792 || o==1795) && std::abs(mult) > 0.001) {
-            LOGFILE << "i:" << i << " o:" << o << " idx:" << idx << " in[i]:" << inputs[i] << " w[idx]:" << wmod[idx] << " mult:" << mult;
+          if ((o == 1792 || o==1795) && std::abs(mult) > 1.00) {
+            LOGFILE << "c:" << channel << " r" << rank << " f:" << file << " i:" << i << " o:" << o << " idx:" << idx << " in[i]:" << inputs[i] << " w[idx]:" << wmod[idx] << " mult:" << mult;
           }
           outputs[o] += mult;
         }
@@ -324,7 +325,11 @@ void BlasComputation::ComputeBlocking() {
         BiasResidualRelu(batch_size, output_channels, &conv_out[0],
                          conv2.biases.data(), res);
       }
+      LOGFILE << "aolsen res tower 33";
+      PrettyPrint(conv_out, output_channels, 33);
     }
+    LOGFILE << "aolsen res tower done 33";
+    PrettyPrint(conv_out, output_channels, 33);
     LOGFILE << "aolsen after residual tower";
     PrettyPrint(conv_out, output_channels);
 
