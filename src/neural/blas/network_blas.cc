@@ -341,6 +341,9 @@ void BlasComputation::ComputeBlocking() {
       BiasResidualRelu(batch_size, output_channels, &res[0],
                        weights_.policy1.biases.data());
 
+      LOGFILE << "aolsen after first policy convolve";
+      PrettyPrint(policy_buffer.data(), num_policy_input_planes);
+
       convolve3.Forward(batch_size, output_channels, num_policy_input_planes,
                         res, weights_.policy.weights.data(),
                         policy_buffer.data());
@@ -348,6 +351,9 @@ void BlasComputation::ComputeBlocking() {
       BiasResidualRelu(batch_size, num_policy_input_planes,
                        &policy_buffer.data()[0], weights_.policy.biases.data(),
                        nullptr, false);
+
+      LOGFILE << "aolsen after second policy convolve";
+      PrettyPrint(policy_buffer.data(), num_policy_input_planes);
 
       // Mapping from convolutional policy to lc0 policy
       for (auto batch = size_t{0}; batch < batch_size; batch++) {
