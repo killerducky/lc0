@@ -139,13 +139,15 @@ void PrettyPrint(float* data, int channels, int this_channel=-1) {
   oss << std::setprecision(5);
   for (size_t channel = 0; channel < channels; channel++) {
     auto skip = this_channel >=0 && this_channel != channel;
-    if (!skip) oss << "channel:" << channel << std::endl;
+    skip = false;
+    //if (!skip) oss << "channel:" << channel << std::endl;
+    if (!skip) oss << "channel:" << channel;
     for (size_t rank = 0; rank < 8; rank++) {
       for (size_t file = 0; file < 8; file++) {
         if (!skip) oss << " " << std::setw(8) << std::setprecision(5) << *data;
         data++;
       }
-      if (!skip) oss << std::endl;
+      //if (!skip) oss << std::endl;
     }
     if (!skip) oss << std::endl;
   }
@@ -303,6 +305,8 @@ void BlasComputation::ComputeBlocking() {
 
       BiasResidualRelu(batch_size, output_channels, &conv_out[0],
                        conv1.biases.data());
+      LOGFILE << "aolsen res tower midpoint";
+      PrettyPrint(conv_out, output_channels);
 
       std::swap(conv_in, res);
       std::swap(conv_out, conv_in);
@@ -325,13 +329,9 @@ void BlasComputation::ComputeBlocking() {
         BiasResidualRelu(batch_size, output_channels, &conv_out[0],
                          conv2.biases.data(), res);
       }
-      LOGFILE << "aolsen res tower 33";
-      PrettyPrint(conv_out, output_channels, 33);
+      LOGFILE << "aolsen res tower";
+      PrettyPrint(conv_out, output_channels);
     }
-    LOGFILE << "aolsen res tower done 33";
-    PrettyPrint(conv_out, output_channels, 33);
-    LOGFILE << "aolsen after residual tower";
-    PrettyPrint(conv_out, output_channels);
 
     if (conv_policy_) {
       // Need to preserve conv_out which is used for value head
