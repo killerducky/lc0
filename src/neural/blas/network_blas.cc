@@ -342,7 +342,7 @@ void BlasComputation::ComputeBlocking() {
                        weights_.policy1.biases.data());
 
       LOGFILE << "aolsen after first policy convolve";
-      PrettyPrint(policy_buffer.data(), num_policy_input_planes);
+      PrettyPrint(res, num_policy_input_planes);
 
       convolve3.Forward(batch_size, output_channels, num_policy_input_planes,
                         res, weights_.policy.weights.data(),
@@ -362,9 +362,21 @@ void BlasComputation::ComputeBlocking() {
           if (j >= 0) {
             output_pol[batch * num_output_policy + j] =
                 policy_buffer[batch * num_policy_input_planes * kSquares + i];
+          } else {
+            // aolsen mask out impossible moves
+            policy_buffer[batch * num_policy_input_planes * kSquares + i] = 0;
           }
         }
       }
+
+      LOGFILE << "aolsen after second policy convolve + masked";
+      PrettyPrint(policy_buffer.data(), num_policy_input_planes);
+      // TODO: Support batches
+      std::vector<float> policy_buffer_softmax(num_output_policy * kSquares);
+
+      SoftmaxActivation(num_policy_input_planes * kSquares, policy_buffer.data(), policy_buffer_softmax.data());
+      LOGFILE << "aolsen after second policy convolve + masked + softmax";
+      PrettyPrint(policy_buffer_softmax.data(), num_policy_input_planes);
 
     } else {
       Convolution1::Forward(
@@ -427,6 +439,12 @@ void BlasComputation::ComputeBlocking() {
       // Get the moves
       SoftmaxActivation(num_output_policy, &output_pol[j * num_output_policy],
                         policy.data());
+      std::ostringstream oss;
+      oss << "aolsen after softmax:" << std::endl;
+      for (auto p : policy) {
+        oss << " " << (p < 0.0001 ? 0 : p);
+      }
+      LOGFILE << oss.str();
 
       policies_.emplace_back(std::move(policy));
     }

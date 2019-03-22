@@ -1253,6 +1253,7 @@ void SearchWorker::FetchSingleNodeResult(NodeToProcess* node_to_process,
     // Edge::SetP does some rounding, so only add to the total after rounding.
     total += edge.edge()->GetP();
   }
+  LOGFILE << "aolsen total:" << total;
 
   // Normalize P values to add up to 1.0.
   if (total > 0.0f) {
