@@ -140,15 +140,12 @@ Or.
 5. (For MacOS 10.14 Mojave):
 
 a. Install developer tools: ``xcode-select --install``
-
 b. Install SDK headers: `installer -pkg /Library/Developer/CommandLineTools/Packages/macOS_SDK_headers_for_macOS_10.14.pkg -target /` (if this doesn't work, use `sudo installer` instead of just `installer`.)
 
 5. (For MacOS 10.15 Catalina, or if the other step 5 fails): 
 
 a. Install developer tools: ``xcode-select --install``
-
 b. Use in terminal: `export CPATH=`xcrun --show-sdk-path`/usr/include` (if this doesn't work, do step 5b then do this step again.)
-
 c. Install Xcode Developer Tools through the app store. You may need to create an apple store account to do this. (The correct application should be the first one that appears with the blueprint and hammer in the Apple Store Search.)
 
 6. Install boost: `brew install boost`
